@@ -1,396 +1,506 @@
 <template>
-  <div id="app">
-    <wlExplorer
-      ref="wl-explorer-cpt"
-      :header-dropdown="headerHandle"
-      :upload-options="uploadOptions"
-      :columns="file_table_columns"
-      :all-path="all_folder_list"
-      :is-folder-fn="isFolderFn"
-      :folderType="rource_type"
-      :data="file_table_data"
-      :props="explorer_prop"
-      size="small"
-      @handleFolder="handleFolder"
-      @upload="fileUpload"
-      @download="download"
-      @search="fileSearch"
-      @del="fileDel"
-      @closeFade="closeOtherLayout(fade)"
-    >
-      <!-- 操作文件夹滑入区 -->
-      <fadeIn v-show="fade.folder">
-        <h3 class="edit-header">
-          <p>{{folder_form.Id?'编辑':'新增'}}文件夹</p>
-        </h3>
-        <el-scrollbar class="scroll">
-          <el-form
-            size="medium"
-            ref="folder_form"
-            label-position="top"
-            :model="folder_form"
-            :rules="folder_rules"
-            class="folder_form rule-form"
-            @keyup.enter.native="submitFolderFrom('folder_form')"
-          >
-            <el-form-item label="文件路径" prop="ParentId">
-              <WlTreeSelect
-                class="u-full"
-                nodeKey="Id"
-                placeholder="请选择文件路径"
-                :props="tree_select_prop"
-                :data="tree_folder_list"
-                v-model="folder_form.ParentId"
-              ></WlTreeSelect>
-            </el-form-item>
-            <el-form-item label="文件夹名称 " prop="Name">
-              <el-input v-model="folder_form.Name" placeholder="请输入文件夹名称"></el-input>
-            </el-form-item>
-            <el-form-item label="备注说明" prop="Describe">
-              <el-input
-                :rows="3"
-                type="textarea"
-                v-model="folder_form.Describe"
-                placeholder="请输入备注说明"
-              ></el-input>
-            </el-form-item>
-          </el-form>
-        </el-scrollbar>
-        <div class="submit-btn-box">
-          <submit-btn @btn="submitFolderFrom('folder_form')" :status="load.folder"></submit-btn>
-          <el-button size="medium" @click="fade.folder = false">取消</el-button>
-        </div>
-      </fadeIn>
+  <div class="explore" :style="{ height: viewHeight + 'px', 'margin-top': fullScreen ? '54px' : '' }"
+    v-loading="loading">
+    <wlExplorer ref="wl-explorer-cpt" :table-height="tableHeight" :data="file_table_data" :columns="file_table_columns"
+      :props="explorer_prop" :check-selectable="checkSelectable" :is-folder-fn="isFolderFn" :preview-type="preview.type"
+      :preview-options="preview.url" @backward="backward" @download="fileDownload" @preview="filePreview"
+      @search="fileSearch">
+
+      <template slot="table-column-top" v-if="searching">
+        <el-table-column align="left" prop="path" label="路径" width="300" show-overflow-tooltip
+          :formatter="pathFormat" />
+      </template>
+
+      <div slot="main" style="text-align: center;margin-top: 5px" v-if="searching">
+        <el-pagination @current-change="handleCurrentChange" :current-page="pagination.page" :pager-count="9"
+          :page-size="pagination.size" :total="pagination.count" small layout="total, prev, pager, next" />
+      </div>
     </wlExplorer>
   </div>
 </template>
 
 <script>
-import WlExplorer from "@/pages/WlExplorer"; // 导入文件管理器
-import fadeIn from "@/components/fade-in"; // 导入文件管理器
-import submitBtn from "@/components/submit-btn"; // 导入防抖提交组件
-import { closeOtherLayout, arrayToTree } from "@/util"; // 导入关闭其他弹出类视图函数
-import {
-  getFileListApi, // 1获取文件夹列表
-  getAllFoldersApi, // 4获取全部文件夹
-  delFileApi, // 6删除文件|文件夹
-} from "@/api"; // 导入接口
-const apiok = 200;
+import request from "@/util/request";
+import { Base64 } from "js-base64";
+import axios from "axios";
+import JSZip from "jszip";
+import * as FileSaver from "file-saver";
+import streamSaver from 'streamsaver'
+import '@/util/zip-stream'
+
+function getQueryParams(url, name){
+    var result = {}
+    var reg = /[?&][^?&#]+=[^?&#]+/g
+    var queryList = url.match(reg) || []
+    for(var i = 0; i < queryList.length; i++) {
+        var item = queryList[i]
+        var temp = item.substring(1).split('=')
+        var key = decodeURIComponent(temp[0])
+        var value = decodeURIComponent(temp[1])
+        result[key] = value;
+    }
+    return name ? result[name] : result;
+}
+
+const serviceHost = getQueryParams(window.location.href, 'serviceHost') || window.location.origin
+const kb = 1024, mb = kb * kb, gb = kb * mb
+const maxSize = 2000
+const getFile = url => {
+  return new Promise((resolve, reject) => {
+    axios({
+      url,
+      method: 'get',
+      responseType: 'arraybuffer'
+    }).then(data => {
+      resolve(data.data)
+    }).catch(error => {
+      reject(error.toString())
+    })
+  })
+}
 
 export default {
-  name: "app",
-  components: {
-    fadeIn,
-    submitBtn,
-    WlExplorer,
-  },
+  name: "SupportFileView",
+  components: {},
+  props: ['width', 'height', 'type', 'fullScreen'],
   data() {
-    const _GB = 1024 * 1024;
-    // const vm = this;
     return {
-      load: {
-        folder: false,
-      }, // loading管理
-      fade: {
-        folder: false,
-      }, // 弹出类视图管理
-      headerHandle: [{ name: "权限", command: "auth" }], // 头部按钮更多操作-自定义权限
+      loading: false,
+      userVisible: true,
+      searching: false,
+      pagination: {
+        page: 1,
+        size: 20,
+        count: 0,
+      },
+      searchForm: { keyword: '' },
       file_table_columns: [
+        { label: "名称", prop: "name" },
         {
-          label: "名称",
-          prop: "Name",
-          minWidth: 120,
-        },
-        {
-          label: "修改日期",
-          align: "center",
-          width: 120,
+          label: "类型", align: "center", width: 90,
           formatter(row) {
-            return row.EditTime.split("T")[0] || "-";
+            return row.type === 1 ? "文件夹" : row.suffix
           },
         },
         {
-          label: "类型",
-          align: "center",
-          width: 90,
+          label: "大小", align: "center", width: 120,
           formatter(row) {
-            return row.Type === 1 ? "文件夹" : row.SuffixName;
-          },
-        },
-        {
-          label: "大小",
-          minWidth: 90,
-          align: "center",
-          formatter(row) {
-            if (row.Size === null) return "-";
-            if (row.Size < 1024) {
-              // 1024以下显示kb
-              return row.Size + "KB";
+            if (row.size === null) return '-'
+            if (row.size < kb) {
+              return row.size + 'B'
+            } else if (row.size < mb) {
+              return (row.size / kb).toFixed(2) + 'KB'
+            } else if (row.size < gb) {
+              return (row.size / mb).toFixed(2) + 'MB'
+            } else {
+              return (row.size / gb).toFixed(2) + 'GB'
             }
-            if (row.Size < _GB) {
-              // 1024*1024
-              let _mb = (row.Size / 1024).toFixed(2);
-              return parseFloat(_mb) + "MB";
-            }
-            let _gb = (row.Size / _GB).toFixed(2);
-            return parseFloat(_gb) + "GB";
           },
         },
-        {
-          label: "创建日期",
-          align: "center",
-          width: 120,
-          formatter(row) {
-            return row.CreateTime.split("T")[0] || "-";
-          },
-        },
-        {
-          label: "作者",
-          minWidth: 100,
-          align: "center",
-          formatter(row) {
-            return row.CreateUserName || "-";
-          },
-        },
-        {
-          label: "描述",
-          minWidth: 100,
-          formatter(row) {
-            return row.Describe || "-";
-          },
-        },
+        { label: "创建日期", prop: "createTime", align: "center", width: 120 },
+        { label: "修改日期", prop: "updateTime", align: "center", width: 120 },
       ], // 自定义表格列
-      file_table_data: [], // 表格数据
-      all_folder_list: [], // 所有文件夹列表
-      tree_folder_list: [], // 树形文件夹列表
-      type: {
-        folder: 1,
-        img: 2,
-        video: 3,
-        other: 4,
-      }, // 文件类型
-      rource_type: {
-        self: 1, // 自建
-      }, // 数据来源类型
       explorer_prop: {
-        name: "Name",
-        match: "Name",
+        name: "name",
+        match: "name",
         splic: true,
-        suffix: "SuffixName",
-        pathId: "Id",
-        pathPid: "ParentId",
-        pathName: "Name",
-        pathChildren: "Children", // String 路径数据 children字段
+        suffix: "suffix",
+        pathId: "id",
+        pathName: "name",
+        pathPid: "pid",
+        pathChildren: "children", // String 路径数据 children字段
         pathConnector: "\\", // String 路径父子数据拼接连接符,默认为'\'
-        pathParents: "Parents", // String 路径数据所有直系祖先节点自增长identityId逗号拼接
-        pathIdentityId: "IdentityId", // String 路径数据自增长id
+        pathParents: "parents", // String 路径数据所有直系祖先节点自增长identityId逗号拼接
+        pathIdentityId: "identityId", // String 路径数据自增长id
       }, // 文件管理器配置项
-      path: {}, // 路径数据
-      folder_form: {
-        ParentId: "",
-        Name: "",
-        preview: [],
-        handle: [],
-        Describe: "",
-      }, // 文件夹表单
-      folder_rules: {
-        ParentId: [
-          { required: true, message: "请选择文件路径", trigger: "blur" },
-        ],
-        Name: [
-          { required: true, message: "请填写文件夹名称", trigger: "blur" },
-        ],
-      }, // 文件夹表单验证
-      child_act_saved: {}, // 存储子组件数据，用于编辑更新
-      tree_select_prop: {
-        label: "Name",
-        children: "Children",
-      }, // 树形下拉框配置项
-      uploadOptions: {
-        aa: 1212,
-      }, // 上传文件附加参数
-    };
+      fileMeta: { path: '', pid: '' },
+      file_table_data: [], // 表格数据
+      preview: { type: 'img', url: '' },
+      adcd: '',
+      herf: window.location.href,
+    }
+  },
+  computed: {
+    viewHeight() {
+      if (this.fullScreen) {
+        return this.height - 54
+      }
+      return this.height - 56
+    },
+    tableHeight() {
+      let h = this.viewHeight - 2 - 80 - 26 - 20
+      if (this.searching) {
+        return h - 31
+      }
+      return h
+    },
+    host() {
+      // TODO: 
+      return serviceHost.endsWith('/') ? serviceHost.substr(0, serviceHost.length - 1) : serviceHost
+    },
+  },
+  mounted() {
+    this.getFileList()
+
+  },
+  watch: {
+    type() {
+      this.resetFileMeta()
+      this.getFileList()
+    },
   },
   methods: {
-    /**
-     * @name 上传文件提交操作
-     */
-    fileUpload(file, cb) {
-      this.uploadOptions.bb = 1;
-      cb();
+    // 获取文件夹列表
+    getFileList() {
+      this.searching = false
+      this.fileMeta.adcd = this.adcd
+      this.fileMeta.type = this.type
+      request({
+        url: `/gdwestServer/sky/basic/shareFile/dataGrid`,
+        method: "post",
+        params: this.fileMeta
+      }).then(res => {
+        if (!this.userVisible) {
+          let data = res.data.filter(item => item.type !== 1)
+          this.file_table_data = data || []
+        } else {
+          this.file_table_data = res.data || []
+        }
+      })
     },
-    download(data, func) {
-      console.log(data, func);
+
+    // 判断是否文件夹函数
+    isFolderFn(row) {
+      return row.type === 1
     },
+
+    checkSelectable(row) {
+      return row.type !== 1
+    },
+
+    resetFileMeta() {
+      this.fileMeta = { path: '', pid: '' }
+    },
+
+    clearBreadcrumb() {
+      const that = this.$refs["wl-explorer-cpt"]
+      that.path.history = that.path.history.slice(0, 1)
+    },
+
+    backward(file) {
+      this.searching = false
+      if (file instanceof Array && file.length > 0) {
+        this.file_table_data = file[file.length - 1]['data']
+      }
+    },
+
     /**
      * 根据关键词搜索文件
      * file: Object 文件属性
-     * update: Boolean 数据是否需要更新（不需要表示已存在）
+     * search: Boolean 是否搜索（不是表示进入文件夹）
      */
-    fileSearch(file, update) {
-      if (update) {
-        this.path = file;
-        this.getFileList();
-      }
-    },
-    // 获取文件夹列表
-    getFileList() {
-      getFileListApi().then(({ data }) => {
-        if (data.StatusCode === apiok) {
-          this.file_table_data = data.Data || [];
-        }
-      });
-    },
-    /**
-     * 编辑文件夹
-     * act:Object 当前选中文件夹
-     * type:String 操作类型 add添加edit编辑
-     * file:Object 当前路径信息
-     */
-    handleFolder(act, type, file) {
-      this.path = file;
-      this.fade.folder = true;
-      if (type === "add") {
-        this.$refs["folder_form"].resetFields();
-        this.folder_form.Id = "";
-        this.folder_form.ParentId = file.id;
-        return;
-      }
-      this.child_act_saved = act;
-      this.folder_form = { ...act };
-    },
-    // 提交文件夹表单
-    submitFolderFrom(formName) {
-      this.$refs[formName].validate((valid) => {
-        if (valid) {
-          this.load.folder = true;
-          setTimeout(() => {
-            this.load.folder = false;
-            // let res_data = data.Data;
-            let res_data = this.folder_form; // 由表单数据模拟服务器返回数据，此处应有服务器返回对应实体
-            res_data.EditTime = res_data.CreateTime = "2019-11-11T11:11:11";
-            res_data.Type = 1;
-            if (!this.folder_form.Id) {
-              // 新增
-              if (this.folder_form.ParentId === this.path.id) {
-                // 新增到当前路径
-                this.file_table_data.unshift(res_data);
-              } else {
-                // 新增其他路径
-                let _new_data = {
-                  id: res_data.Id,
-                  pid: res_data.ParentId,
-                  path: res_data.Name,
-                };
-                this.$refs["wl-explorer-cpt"].updateHistoryData(
-                  { Id: res_data.ParentId },
-                  [_new_data]
-                );
-              }
-            } else {
-              // 编辑
-              this.child_act_saved.Name = res_data.Name;
-              this.child_act_saved.Describe = res_data.Describe;
-            }
-            this.fade.folder = false;
-            this.$message({
-              showClose: true,
-              message: "操作成功",
-              type: "success",
-            });
-          }, 1000);
+    fileSearch(file, search) {
+      if (search) {
+        if (file.key) {
+          this.clearBreadcrumb()
+          this.searchForm.keyword = file.key
+          this.handleCurrentChange(1)
         } else {
-          return false;
+          if (this.type === 'floodProject') {
+            this.$refs["wl-explorer-cpt"].file = { pid: "", id: "", path: "", key: "" }
+            this.clearBreadcrumb()
+            this.resetFileMeta()
+            this.getFileList()
+          } else {
+            this.$message.warning('请输入关键词后再点击搜索')
+          }
         }
-      });
-    },
-    // 删除文件
-    fileDel(data) {
-      let cannot_del_data = []; // 收集不可删除数据
-      let normal_data_file = []; // 收集可删除文件
-      let normal_data_folder = []; // 收集可删除文件夹
-      data.forEach((i) => {
-        i.RourceType !== this.rource_type.self
-          ? cannot_del_data.push(i) // 不可删除数据
-          : i.Type === this.type.folder
-          ? normal_data_folder.push(i.Id) // 可删除文件夹
-          : normal_data_file.push(i.Id); // 可删除文件
-      });
-      // 不可删除数据进行提示
-      if (cannot_del_data.length > 0) {
-        let _msg = '<p class="title">以下文件或文件夹不可删除，已自动过滤</p>';
-        cannot_del_data.forEach((i) => {
-          _msg += `<p class="msg">${i.Name}</p>`;
-        });
-        this.$message({
-          dangerouslyUseHTMLString: true,
-          showClose: true,
-          message: _msg,
-          type: "warning",
-          customClass: "mulit-msg",
-        });
+      } else {
+        this.resetFileMeta()
+        this.file_table_data.filter(item => {
+          if (item.id === file.id) {
+            this.fileMeta.path = item.path
+            this.fileMeta.pid = item.id
+          }
+        })
+        this.getFileList()
       }
-      if (normal_data_folder.length === 0 && normal_data_file.length === 0)
-        return;
-      // 可删除数据正常删除
-      let _data = {
-        FolderIds: normal_data_folder,
-        FolderFileIds: normal_data_file,
-      };
-      delFileApi(_data).then(({ data }) => {
-        if (data.StatusCode === apiok) {
-          this.file_table_data = this.file_table_data.filter(
-            (i) => ![...normal_data_file, ...normal_data_folder].includes(i.Id)
-          );
-          this.$message({
-            showClose: true,
-            message: data.Message,
-            type: "success",
-          });
+    },
+
+    search() {
+      this.searching = true
+      this.searchForm.adcd = this.adcd
+      this.searchForm.type = this.type
+      this.searchForm.page = this.pagination.page
+      this.searchForm.rows = this.pagination.size
+      request({
+        url: `/wisdom-port/sky/supportFile/search`,
+        method: "post",
+        params: this.searchForm
+      }).then(res => {
+        if (res && res.data) {
+          this.file_table_data = res.data.content || []
+          this.pagination.count = res.data.totalElements
         }
-      });
+      })
     },
-    // 获取所有文件夹
-    getAllFolders() {
-      getAllFoldersApi().then(({ data }) => {
-        if (data.StatusCode === apiok) {
-          this.all_folder_list = data.Data || [];
-          let _list = [...this.all_folder_list];
-          let options = {
-            id: this.explorer_prop.pathId,
-            pid: this.explorer_prop.pathPid,
-            children: "Children",
-          };
-          this.tree_folder_list = arrayToTree(_list, options);
+
+    handleCurrentChange(val) {
+      this.pagination.page = val
+      this.search()
+    },
+
+    filePreview(data, cb) {
+      const path = this.host + data.path
+      console.log(this.host)
+      if (data.type === 2) {
+        this.preview.url = path
+        this.preview.type = 'img'
+        cb()
+      } else if (data.type === 3) {
+        this.preview.url = path + '#toolbar=0'
+        // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+        this.preview.type = 'iframe'
+        cb()
+      } else if (data.type === 4) {
+        // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+        this.preview.url = `https://10.44.47.80:7891/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+        this.preview.type = 'iframe'
+        cb()
+      } else {
+        window.open(path, '_blank')
+      }
+    },
+
+    fileDownload(data, func) {
+      if (data.length === 1) {
+        const file = data[0]
+        if (file.type !== 1 && this.checkSize(file)) {
+          const path = this.host + file.path
+          if (file.type === 2 || file.type === 3) {
+            fetch(path).then(res => res.blob()).then(blob => {
+              const a = document.createElement('a')
+              a.href = URL.createObjectURL(blob)
+              a.style.display = 'none'
+              a.download = file.name
+              document.body.appendChild(a)
+              a.click()
+              document.body.removeChild(a)
+            })
+          } else {
+            window.open(path)
+          }
         }
-      });
+        return
+      }
+
+      let totalSize = 0
+      data.forEach(item => totalSize += item.size)
+
+      const max = window.WritableStream ? maxSize * 2 : maxSize
+      if (totalSize > max * mb) {
+        this.$message.error(`文件总大小超过${max}MB, 请取消部分文件!`)
+        return
+      }
+
+      this.loading = true
+      if (window.WritableStream) {
+        this.streamDownload(data)
+      } else {
+        this.normalDownload(data)
+      }
+
     },
-    // 判断是否文件夹函数
-    isFolderFn(row) {
-      return row.Type === this.type.folder;
+
+    streamDownload(data) {
+      const fileIterator = data.map(item => {
+        return {
+          name: item.name,
+          url: this.host + item.path
+        }
+      }).values()
+      const readableZipStream = new ZIP({
+        async pull(ctrl) {
+          const fileInfo = fileIterator.next()
+          if (fileInfo.done) {
+            ctrl.close()
+          } else {
+            const { name, url } = fileInfo.value
+            return fetch(url).then(res => {
+              ctrl.enqueue({
+                name,
+                stream: () => res.body
+              })
+            })
+          }
+        }
+      })
+      if (readableZipStream.pipeTo) {
+        readableZipStream
+          .pipeTo(streamSaver.createWriteStream(new Date().getTime() + '.zip'))
+          .then(() => this.$message.success('下载成功'))
+          .finally(() => this.loading = false)
+      } else {
+        this.normalDownload(data)
+      }
     },
-  },
-  created() {
-    this.closeOtherLayout = closeOtherLayout;
-    this.getAllFolders();
-    this.getFileList();
-  },
-};
+
+    normalDownload(data) {
+
+      const zip = new JSZip()
+      const promises = []
+      data.forEach(item => {
+        const path = this.host + item.path
+        const promise = getFile(path).then(data => zip.file(item.name, data, { binary: true }))
+        promises.push(promise)
+      })
+      Promise.all(promises).then(() => {
+        zip.generateAsync({ type: 'blob' }).then(content => {
+          FileSaver.saveAs(content, new Date().getTime())
+        })
+      }).finally(() => this.loading = false)
+    },
+
+    checkSize(file) {
+      if (file.size > maxSize * mb) {
+        this.$message.error(`'${file.name}'大小超过${maxSize}MB, 请联系管理员获取!`)
+        return false
+      }
+      return true
+    },
+
+    getTreeSelected(val) {
+      this.adcd = val.length > 0 ? val[0].id : getLoginUser().dscd.dscd
+    },
+
+    pathFormat(row, col, cell) {
+      const arr = cell.split('/')
+      return '/' + arr.slice(4, arr.length - 1).join('/')
+    },
+  }
+}
 </script>
 
-<style>
-#app {
-  font-family: "Avenir", Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
-  position: absolute;
-  top: 0;
-  left: 0;
-  padding: 25px;
+<style scoped>
+
+.explore>>>.wl-explorer .wl-main-scroll {
   width: 100%;
-  height: 100%;
-  background: #f7f7f7;
-  box-sizing: border-box;
+  height: calc(100% - 105px) !important;
+}
+
+/*预览*/
+.explore>>>.wl-explorer .file-view-components {
+  top: 90px;
+  left: 2px;
+  right: 2px;
+  bottom: 1px;
+}
+
+.explore>>>h3 {
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+
+.explore>>>.file-view>.player-item {
+  border-radius: 5px;
+}
+
+.explore>>>.u-img-pre {
+  object-fit: contain;
+}
+
+/*操作栏*/
+.explore>>>.wlSelect {
+  transform: translateY(-1px);
+  background-color: #1B2A3C !important;
+  border-color: #3F4854;
+  color: #d9d9d9;
+}
+
+.explore>>>.el-input__inner {
+  /* background-color: #1B2A3C;
+  border-color: #1B2A3C; 
+  color: #e5e5e5;
+  */
+  background: #fff;
+}
+
+.wl-explorer>>>.file-search {
+  color: white;
+}
+
+.explore>>>.el-input-group__append,
+.el-input-group__prepend {
+  background-color: #49a7ea;
+  border: 1px solid #49a7ea;
+}
+
+.explore>>>.el-input-group__append button.el-button {
+  background-color: #49a7ea;
+  color: white;
+}
+
+.explore>>>.el-input-group__append button.el-button:hover {
+  background-color: #66b1ff;
+  color: white;
+}
+
+.explore>>>.el-tag {
+  background-color: #49a7ea;
+  border-color: #3F4854;
+  color: white;
+}
+
+.explore>>>.el-tag .el-tag__close {
+  color: white;
+}
+
+.explore>>>.el-select .el-tag__close.el-icon-close {
+  background-color: transparent;
+}
+
+.explore>>>.el-select .el-tag__close.el-icon-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/*面包屑*/
+.explore>>>.el-breadcrumb__item:last-child .el-breadcrumb__inner a {
+  color: #333;
+}
+
+/*表格*/
+.explore>>>.el-table--border {
+  border: none;
+}
+
+.explore>>>.el-table::before {
+  height: 0;
+}
+
+.explore>>>.el-table::after {
+  width: 0;
+}
+
+
+
+.explore>>>.btn-prev {
+  background-color: transparent;
+  color: white;
+}
+
+.explore>>>.btn-prev:hover {
+  background-color: transparent;
+  color: #409EFF;
+}
+
+.explore>>>.btn-next {
+  background-color: transparent;
+  color: white;
+}
+
+.explore>>>.btn-next:hover {
+  background-color: transparent;
+  color: #409EFF;
 }
 </style>
