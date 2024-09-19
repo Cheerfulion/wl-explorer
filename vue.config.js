@@ -1,6 +1,11 @@
+const isProd = process.env.NODE_ENV === 'production'
+
 module.exports = {
   // 将资源打包为相对路径
   // publicPath: "././",
+  configureWebpack: {
+    devtool: isProd ? 'source-map' : 'cheap-module-source-map',
+  },  
   publicPath: './',
   lintOnSave: false, // 保存时检查格式，使用eslint
   crossorigin: 'anonymous', // htmlWebpackPlugin

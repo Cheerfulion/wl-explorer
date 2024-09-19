@@ -2,7 +2,7 @@
   <div id="app">
     <AppOldView></AppOldView>
     <ShareFileView></ShareFileView>
-    <SupportFileView></SupportFileView>
+    <!-- <SupportFileView></SupportFileView> -->
   </div>
 </template>
 

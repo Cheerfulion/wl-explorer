@@ -37,7 +37,7 @@
             <i class="el-icon-arrow-down el-icon--right"></i>
           </el-button>
           <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item command="wl-move">移动</el-dropdown-item>
+            <!-- <el-dropdown-item command="wl-move">移动</el-dropdown-item> -->
             <el-dropdown-item command="wl-download">下载</el-dropdown-item>
             <!-- props自定义头部更多操作 -->
             <el-dropdown-item
@@ -95,7 +95,7 @@
           />
           {{ file.path }}
         </div>
-        <el-autocomplete
+        <!-- <el-autocomplete
           class="u-full"
           ref="file-path-ipt"
           placeholder="请输入文件路径"
@@ -112,7 +112,7 @@
             alt="文件夹"
             title="文件夹"
           />
-        </el-autocomplete>
+        </el-autocomplete> -->
       </el-form-item>
       <el-form-item class="file-search-box">
         <el-input
@@ -313,7 +313,7 @@
             label-position="top"
             class="template_form rule-form"
           >
-            <el-form-item label="文件路径">
+            <!-- <el-form-item label="文件路径">
               <wlTreeSelect
                 class="u-full"
                 :size="size"
@@ -323,7 +323,7 @@
                 v-model="upload_selected"
                 @change="uploadPathChange"
               ></wlTreeSelect>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="导入文件">
               <uploadItem
                 ref="upload-item"
@@ -496,7 +496,7 @@ export default {
       default: "img",
     },
     // 预览文件地址或配置项
-    previewOptions: Object,
+    previewOptions: [Object, String],
     // 拼接路径配置项
     splicOptions: Object,
     size: {
@@ -564,10 +564,10 @@ export default {
     },
     // 显示文件路径输入框
     handleFilePath() {
-      this.layout.edit_path = true;
-      this.$nextTick(() => {
-        this.$refs["file-path-ipt"].focus();
-      });
+      // this.layout.edit_path = true;
+      // this.$nextTick(() => {
+      //   this.$refs["file-path-ipt"].focus();
+      // });
     },
     // 输入文件路径
     filePathChange(item) {
@@ -604,13 +604,13 @@ export default {
     // 搜索文件
     fileSearch() {
       if (this.file.key !== "") {
-        this.$emit("search", this.file, true);
+        this.$emit("search", {pid: this.file.id, key: this.file.key}, true);
         return;
       }
       let _act_item = this.path.history.find((i) => i.id === this.file.id);
       _act_item
         ? this.routerActive(_act_item, _act_item.data)
-        : this.$emit("search", this.file, true);
+        : this.$emit("search", {pid: this.file.id, key: this.file.key}, true);
     },
     /**
      * 往历史里添加新的步骤
@@ -618,7 +618,8 @@ export default {
      * data: Array 当前路径下的数据
      */
     routerPush(file, data = []) {
-      splicParentsUntil(this.allPath, file, this.selfProps);
+      console.log('routerPush', file, data);
+      // splicParentsUntil(this.allPath, file, this.selfProps);
       this.clearSearchKey();
       this.path.history.push({
         ...file,
@@ -627,7 +628,8 @@ export default {
       this.self_data = data;
       this.file.pid = file.pid;
       this.file.id = file.id;
-      this.file.path = splicParentsUntil(this.allPath, file, this.selfProps);
+      // this.file.path = splicParentsUntil(this.allPath, file, this.selfProps);
+      this.file.path = file.path;
       this.path.level = !file.id || file.id === guid ? 1 : 2;
       this.path.index = -1; // 将步骤从新回到原位
     },
@@ -637,10 +639,12 @@ export default {
      * data: Array 当前路径下的数据
      */
     routerActive(file, data) {
+      console.log('routerActive', file, data);
       this.clearSearchKey();
       this.file.pid = file.pid;
       this.file.id = file.id;
-      this.file.path = splicParentsUntil(this.allPath, file, this.selfProps);
+      // this.file.path = splicParentsUntil(this.allPath, file, this.selfProps);
+      this.file.path = file.path;
       this.self_data = data;
       this.path.level = !file.id || file.id === guid ? 1 : 2;
     },
@@ -747,7 +751,7 @@ export default {
         pid: row[this.selfProps.pathPid],
         path: row[this.selfProps.pathName],
       });
-      this.$emit("search", this.file, true);
+      this.$emit("search", {pid: this.file.id}, true);
     },
     // 文件、文件夹移动
     fileMove() {

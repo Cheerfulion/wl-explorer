@@ -29,7 +29,7 @@ http.interceptors.request.use(
 http.interceptors.response.use(
   function(res) {
     // Do something with response data
-    return res;
+    return res.data;
   },
   function(err) {
     let config = err.config;

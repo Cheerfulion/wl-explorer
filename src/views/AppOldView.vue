@@ -236,7 +236,7 @@ export default {
     },
     // 获取文件夹列表
     getFileList() {
-      getFileListApi().then(({ data }) => {
+      getFileListApi().then((data) => {
         if (data.StatusCode === apiok) {
           this.file_table_data = data.Data || [];
         }
@@ -338,7 +338,7 @@ export default {
         FolderIds: normal_data_folder,
         FolderFileIds: normal_data_file,
       };
-      delFileApi(_data).then(({ data }) => {
+      delFileApi(_data).then((data) => {
         if (data.StatusCode === apiok) {
           this.file_table_data = this.file_table_data.filter(
             (i) => ![...normal_data_file, ...normal_data_folder].includes(i.Id)
@@ -353,7 +353,7 @@ export default {
     },
     // 获取所有文件夹
     getAllFolders() {
-      getAllFoldersApi().then(({ data }) => {
+      getAllFoldersApi().then((data) => {
         if (data.StatusCode === apiok) {
           this.all_folder_list = data.Data || [];
           let _list = [...this.all_folder_list];
