@@ -60,7 +60,7 @@ const getFile = url => {
 }
 
 export default {
-  name: "SupportFileView",
+  name: "AppView",
   components: {},
   props: ['width', 'height', 'type', 'fullScreen'],
   data() {
@@ -136,7 +136,7 @@ export default {
     },
     host() {
       // TODO: 
-      return serviceHost.endsWith('/') ? serviceHost.substr(0, serviceHost.length - 1) : serviceHost
+      return serviceHost
     },
   },
   mounted() {
@@ -156,7 +156,7 @@ export default {
       this.fileMeta.adcd = this.adcd
       this.fileMeta.type = this.type
       request({
-        url: `/gdwestServer/sky/basic/shareFile/dataGrid`,
+        url: `${serviceHost}/gdwestServer/sky/basic/shareFile/dataGrid`,
         method: "post",
         params: this.fileMeta
       }).then(res => {
@@ -234,7 +234,7 @@ export default {
       this.searchForm.page = this.pagination.page
       this.searchForm.rows = this.pagination.size
       request({
-        url: `/wisdom-port/sky/supportFile/search`,
+        url: `${serviceHost}/gdwestServer/sky/basic/shareFile/search`,
         method: "post",
         params: this.searchForm
       }).then(res => {
