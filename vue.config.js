@@ -1,6 +1,7 @@
 module.exports = {
   // 将资源打包为相对路径
   // publicPath: "././",
+  publicPath: './',
   lintOnSave: false, // 保存时检查格式，使用eslint
   crossorigin: 'anonymous', // htmlWebpackPlugin
   devServer: { // 对开发服务的设置

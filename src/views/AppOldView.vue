@@ -1,5 +1,6 @@
 <template>
-  <div id="app">
+  <div class="explore">
+    <h2>AppOldView</h2>
     <wlExplorer
       ref="wl-explorer-cpt"
       :header-dropdown="headerHandle"
@@ -379,18 +380,5 @@ export default {
 </script>
 
 <style>
-#app {
-  font-family: "Avenir", Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
-  position: absolute;
-  top: 0;
-  left: 0;
-  padding: 25px;
-  width: 100%;
-  height: 100%;
-  background: #f7f7f7;
-  box-sizing: border-box;
-}
+
 </style>
