@@ -31,7 +31,8 @@ export default {
   position: absolute;
   top: 2px;
   right: 2px;
-  bottom: 2px;
+  // bottom: 2px;
+  bottom: -56px;
   z-index: 7;
   width: 325px;
   background-color: #fff;

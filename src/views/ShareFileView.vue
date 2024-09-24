@@ -1,18 +1,22 @@
 <template>
   <div class="explore" :style="{ height: viewHeight + 'px', 'margin-top': fullScreen ? '54px' : '' }"
     v-loading="loading">
-    <h2>ShareFileView</h2>
     <!-- :table-height="tableHeight"  -->
     <wlExplorer ref="wl-explorer-cpt" :data="file_table_data" :columns="file_table_columns"
       :props="explorer_prop" :is-folder-fn="isFolderFn" :preview-type="preview.type"
       :preview-options="preview.url" 
+      :upload-url="uploadUrl"
+      :upload-headers="uploadHeaders"
+      :upload-options="uploadOptions"
       @preview="filePreview"
       @search="fileSearch"
       @handleFolder="handleFolder"
+      @uploadSuccess="handleUploadSuccess"
       @del="fileDel"
       @upload="fileUpload"
       @download="download"
-      @closeFade="closeOtherLayout(fade)">
+      @closeFade="closeOtherLayout(fade)"
+      @routerPush="_ => fade.folder = false">
 
       <!-- <template slot="table-column-top" v-if="searching">
         <el-table-column align="left" prop="path" label="路径" width="300" show-overflow-tooltip
@@ -75,6 +79,7 @@ import JSZip from "jszip";
 import * as FileSaver from "file-saver";
 import streamSaver from 'streamsaver'
 import '@/util/zip-stream'
+import {getLoginUser, removeLoginUser} from '@/util/auth'
 
 function getQueryParams(url, name){
     var result = {}
@@ -215,6 +220,9 @@ export default {
           { required: true, message: "请填写文件夹名称", trigger: "blur" },
         ],
       }, // 文件夹表单验证
+      uploadUrl: '',
+      uploadHeaders: {},
+      uploadOptions: {}
     }
   },
   computed: {
@@ -238,6 +246,8 @@ export default {
   },
   created() {
     this.closeOtherLayout = closeOtherLayout;
+    this.uploadUrl = `${serviceHost}/gdwestServer/sky/basic/shareFile`
+    this.uploadHeaders = { token: getLoginUser().token }
     this.getFileList()
   },
   watch: {
@@ -252,18 +262,18 @@ export default {
       this.searching = false
       this.fileMeta.adcd = this.adcd
       this.fileMeta.type = this.type
-      Object.assign({}, queryParams, this.fileMeta)
+      Object.assign({pageSize: 1000}, queryParams, this.fileMeta)
       request({
-        url: `${serviceHost}/gdwestServer/sky/basic/shareFile/dataGrid`,
-        method: "post",
+        url: `${serviceHost}/gdwestServer/sky/basic/shareFile`,
+        method: "get",
         params: queryParams
       }).then(res => {
         if (res.code !== 'OK') return
         if (!this.userVisible) {
-          let data = res.data.filter(item => item.type !== 1)
+          let data = res.data.list.filter(item => item.type !== 1)
           this.file_table_data = data || []
         } else {
-          this.file_table_data = res.data || []
+          this.file_table_data = res.data.list || []
         }
       })
     },
@@ -452,23 +462,24 @@ export default {
     filePreview(data, cb) {
       const path = data.url || (this.host + data.path)
       console.log('filePreview', path, data)
-      if (data.type === 2) {
-        this.preview.url = path
-        this.preview.type = 'img'
-        cb()
-      } else if (data.type === 3) {
-        this.preview.url = path + '#toolbar=0'
-        // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
-        this.preview.type = 'iframe'
-        cb()
-      } else if (data.type === 4) {
-        // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
-        this.preview.url = `https://10.44.47.80:7891/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
-        this.preview.type = 'iframe'
-        cb()
-      } else {
-        window.open(path, '_blank')
-      }
+      // if (data.type === 2) {
+      //   this.preview.url = path
+      //   this.preview.type = 'img'
+      //   cb()
+      // } else if (data.type === 3) {
+      //   this.preview.url = path + '#toolbar=0'
+      //   // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+      //   this.preview.type = 'iframe'
+      //   cb()
+      // } else if (data.type === 4) {
+      //   // this.preview.url = `${this.host}/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+      //   this.preview.url = `https://10.44.47.80:7891/preview/onlinePreview?url=${encodeURIComponent(Base64.encode(path))}`
+      //   this.preview.type = 'iframe'
+      //   cb()
+      // } else {
+      //   window.open(path, '_blank')
+      // }
+      window.open(path, '_blank')
     },
 
     download(data, func) {
@@ -580,7 +591,15 @@ export default {
     fileUpload(file, cb) {
       console.log('fileUpload', file, cb);
       // this.uploadOptions.bb = 1;
+      this.uploadOptions.pid = file.pathId
+      this.uploadOptions.path = file.path
       cb();
+    },
+
+    // 上传完成回调
+    handleUploadSuccess({ data }) {
+      console.log('handleUploadSuccess', data);
+      this.fileSearch({pid: data.pid, key: '' }, true)
     },
 
     // getTreeSelected(val) {

@@ -304,7 +304,7 @@
     </el-dialog>
     <!-- 文件上传区 -->
     <template v-if="useUpload">
-      <fade-in v-show="layout.upload">
+      <fade-in v-if="layout.upload">
         <h3 class="edit-header">上传文件</h3>
         <el-scrollbar class="scroll">
           <el-form
@@ -373,7 +373,7 @@ export default {
         upload: false, // 上传
       }, // loading状态
       uploading: {
-        name: "JS从脱贫到脱发你好长啊",
+        name: "",
         percentage: 0,
         ing: false,
       }, // 当前上传文件状态
@@ -603,14 +603,14 @@ export default {
     },
     // 搜索文件
     fileSearch() {
-      if (this.file.key !== "") {
+      // if (this.file.key !== "") {
         this.$emit("search", {pid: this.file.id, key: this.file.key}, true);
         return;
-      }
-      let _act_item = this.path.history.find((i) => i.id === this.file.id);
-      _act_item
-        ? this.routerActive(_act_item, _act_item.data)
-        : this.$emit("search", {pid: this.file.id, key: this.file.key}, true);
+      // }
+      // let _act_item = this.path.history.find((i) => i.id === this.file.id);
+      // _act_item
+      //   ? this.routerActive(_act_item, _act_item.data)
+      //   : this.$emit("search", {pid: this.file.id, key: this.file.key}, true);
     },
     /**
      * 往历史里添加新的步骤
@@ -618,8 +618,15 @@ export default {
      * data: Array 当前路径下的数据
      */
     routerPush(file, data = []) {
-      console.log('routerPush', file, data);
+      console.log('routerPush', this.path.history, this.path.index, this.path.level);
       // splicParentsUntil(this.allPath, file, this.selfProps);
+      this.layout = {
+        show_list: this.layout.show_list, // 文件展示形式
+        edit_path: false, // 是否编辑路径
+        view: false, // 预览视图
+        move: false, // 移动视图
+        upload: false, // 上传视图
+      }
       this.clearSearchKey();
       this.path.history.push({
         ...file,
@@ -632,6 +639,7 @@ export default {
       this.file.path = file.path;
       this.path.level = !file.id || file.id === guid ? 1 : 2;
       this.path.index = -1; // 将步骤从新回到原位
+      this.$emit("routerPush", this.path.history);
     },
     /**
      * 处理当前步骤数据
@@ -639,7 +647,6 @@ export default {
      * data: Array 当前路径下的数据
      */
     routerActive(file, data) {
-      console.log('routerActive', file, data);
       this.clearSearchKey();
       this.file.pid = file.pid;
       this.file.id = file.id;
@@ -699,26 +706,30 @@ export default {
         this.routerActive(_next, _next.data);
       } else {
         if (this.path.level === 1) return;
-        let _pid = this.file.pid !== guid ? this.file.pid : "";
-        let _parent_history = this.path.history.find((i) => i.id === _pid);
-        if (_parent_history) {
-          this.path.history.splice(
-            this.path.history.findIndex((i) => i.id === _pid),
-            1
-          );
-          this.routerPush(_parent_history, _parent_history.data);
-          return;
-        }
-        // 历史记录没有时 从全部路径里找
-        let _parent = this.selfPathHistory.find((i) => i.id === _pid);
-        if (!_parent) return;
-        this.routerPush({
-          id: _parent[this.selfProps.pathId],
-          pid: _parent[this.selfProps.pathPid],
-          path: _parent[this.selfProps.pathName],
-        });
+        this.path.index = 0;
+        let _top = this.path.history[this.path.index];
+        this.path.history = this.path.history.slice(this.path.index + 1)
+        this.routerActive(_top, _top.data);
+        // let _pid = this.file.pid !== guid ? this.file.pid : "";
+        // let _parent_history = this.path.history.find((i) => i.id === _pid);
+        // if (_parent_history) {
+        //   this.path.history.splice(
+        //     this.path.history.findIndex((i) => i.id === _pid),
+        //     1
+        //   );
+        //   this.routerPush(_parent_history, _parent_history.data);
+        //   return;
+        // }
+        // // 历史记录没有时 从全部路径里找
+        // let _parent = this.selfPathHistory.find((i) => i.id === _pid);
+        // if (!_parent) return;
+        // this.routerPush({
+        //   id: _parent[this.selfProps.pathId],
+        //   pid: _parent[this.selfProps.pathPid],
+        //   path: _parent[this.selfProps.pathName],
+        // });
 
-        this.$emit("search", this.file, true);
+        // this.$emit("search", this.file, true);
       }
     },
     /**
@@ -745,6 +756,9 @@ export default {
         this.routerPush(_children, _children.data);
         return;
       }
+      // 将当前路由 routerPush 到 path.history 中
+      const curRouter = this.path.history[this.path.index]
+      if (curRouter) this.routerPush(curRouter, curRouter.data);
       // 历史找不到子集时 请求更新
       this.routerPush({
         id: row[this.selfProps.pathId],
@@ -795,7 +809,7 @@ export default {
     },
     // 文件上传提交操作
     saveUpload() {
-      this.$emit("upload", this.uoload_data, this.handleUpload);
+      this.$emit("upload", {path: this.file.path, ...this.uoload_data }, this.handleUpload);
     },
     // 手动上传文件
     handleUpload() {

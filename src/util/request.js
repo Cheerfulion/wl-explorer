@@ -1,5 +1,6 @@
 import Axios from "axios";
 import { Message, Loading, MessageBox } from "element-ui";
+import {getLoginUser, removeLoginUser} from '@/util/auth'
 
 // 定义axios配置
 const http = Axios.create({
@@ -18,6 +19,18 @@ http.defaults.retryDelay = 1000;
 // 添加一个请求拦截器
 http.interceptors.request.use(
   function(config) {
+    config.headers = {
+      Pragma: 'no-cache',
+      ...config.headers
+    }
+    // 在发送请求之前做些什么
+    if (getLoginUser()) {
+      config.headers.token = getLoginUser().token;
+    }
+    if(config.contentType=='json'){
+      config.headers["Content-type"] = "application/json;charset=UTF-8";
+    }
+
     return config;
   },
   function(error) {
@@ -28,8 +41,17 @@ http.interceptors.request.use(
 // 添加一个响应拦截器
 http.interceptors.response.use(
   function(res) {
-    // Do something with response data
-    return res.data;
+    res = res.data;
+    if (res instanceof Blob || res instanceof ArrayBuffer) return res
+    if (res.code === 'OK') return res
+    Message({
+      message: res.msg || res.code,
+      type: 'error',
+      duration: 5000
+    })
+    console.error(res)
+    // res.code === '1013' && router.push({ name: 'Login' })
+    return Promise.reject(res)
   },
   function(err) {
     let config = err.config;
