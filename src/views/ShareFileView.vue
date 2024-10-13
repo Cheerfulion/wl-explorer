@@ -246,7 +246,7 @@ export default {
   },
   created() {
     this.closeOtherLayout = closeOtherLayout;
-    this.uploadUrl = `${serviceHost}/gdwestServer/sky/basic/shareFile`
+    this.uploadUrl = `${serviceHost}/gdwestServer/sky/shareFile/save`
     this.uploadHeaders = { token: getLoginUser().token }
     this.getFileList()
   },
@@ -260,15 +260,19 @@ export default {
     // 获取文件夹列表
     getFileList(queryParams = {}) {
       this.searching = false
-      this.fileMeta.adcd = this.adcd
-      this.fileMeta.type = this.type
-      Object.assign({pageSize: 1000}, queryParams, this.fileMeta)
+      // this.fileMeta.adcd = this.adcd
+      // this.fileMeta.type = this.type
+      queryParams = {pageSize: 1000, pageNum: 1, ...queryParams}
       request({
-        url: `${serviceHost}/gdwestServer/sky/basic/shareFile`,
+        url: `${serviceHost}/gdwestServer/sky/shareFile/queryPage`,
         method: "get",
         params: queryParams
       }).then(res => {
         if (res.code !== 'OK') return
+        res.data.list = (res.data.list || []).map(item => {
+          item.suffix = item.suffix && item.suffix.replace('.', '')
+          return item
+        })
         if (!this.userVisible) {
           let data = res.data.list.filter(item => item.type !== 1)
           this.file_table_data = data || []
@@ -306,23 +310,23 @@ export default {
       this.$refs[formName].validate((valid) => {
         if (valid) {
           this.load.folder = true;
-          let { id, pid, name, path, describe } = this.folderForm; // 由表单数据模拟服务器返回数据，此处应有服务器返回对应实体
-          const data = { id, pid, name, path, describe, type: 1 }
-          const addFolderApi = data => request({
-            url: `${serviceHost}/gdwestServer/sky/basic/shareFile`,
+          let { id, pid, name, path, describe } = this.folderForm;
+          let data = { id, pid, name, path, describe, type: '1', rourceType: '2' }
+          const formData = new FormData();
+          data = JSON.parse(JSON.stringify(data))
+          data.path = data.path || ''
+          if (!data.id) { // 新增
+            data.path = `${data.path}/${data.name}`
+          } else { // 编辑
+            data.path = `${data.path.substring(0, data.path.lastIndexOf('/'))}/${data.name}`
+          }
+          Object.keys(data).forEach(key => { formData.append(key, data[key]); });
+          request({
+            url: `${serviceHost}/gdwestServer/sky/shareFile/save`,
             method: "post",
-            data: {
-              ...data,
-              path: `${path}/${data.name}`
-            }
-          })
-          const updateFolderApi = data => request({
-            url: `${serviceHost}/gdwestServer/sky/basic/shareFile/${data.id}`,
-            method: "patch",
-            data
-          })
-          const folderApi = !data.id ? addFolderApi(data) : updateFolderApi(data)
-          folderApi.then(res => {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            data: formData
+          }).then(res => {
             if (res.code !== 'OK') return
             this.fade.folder = false;
             this.$message({
@@ -340,9 +344,9 @@ export default {
 
     // 删除文件
     fileDel(data) {
-      console.log('fileDel', data)
-      const notDeleteDatas = data.filter(item => item.rourceType === 1) // 收集不可删除数据
-      const canDeleteDatas = data.filter(item => item.rourceType !== 1) // 收集可删除数据
+      console.log('fileDel', data, this.path)
+      const notDeleteDatas = data.filter(item => item.rourceType == 1) // 收集不可删除数据
+      const canDeleteDatas = data.filter(item => item.rourceType != 1) // 收集可删除数据
       // 不可删除数据进行提示
       if (notDeleteDatas.length) {
         let msg = '<p style="margin: 0 0 10px">以下文件或文件夹不可删除，已自动过滤：</p>';
@@ -357,21 +361,21 @@ export default {
       if (!notDeleteDatas.length && !canDeleteDatas) return this.$message.warning('未选择文件')
       const deleteIds = canDeleteDatas.map(item => item.id)
       request({
-        url: `${serviceHost}/gdwestServer/sky/basic/shareFile/${deleteIds.join(',')}`,
+        url: `${serviceHost}/gdwestServer/sky/shareFile/deleteByIds?ids=${deleteIds.join(',')}`,
         method: "delete",
       }).then(res => {
         if (res.code !== 'OK') return
-        this.getFileList({pid: this.path.id})
+        this.getFileList({pid: this.path && this.path.pid})
       })
     },
 
     // 判断是否文件夹函数
     isFolderFn(row) {
-      return row.type === 1
+      return row.type == 1
     },
 
     // checkSelectable(row) {
-    //   return row.type !== 1
+    //   return row.type != 1
     // },
 
     resetFileMeta() {
@@ -443,7 +447,7 @@ export default {
     //   this.searchForm.page = this.pagination.page
     //   this.searchForm.rows = this.pagination.size
     //   request({
-    //     url: `${serviceHost}/gdwestServer/sky/basic/shareFile/search`,
+    //     url: `${serviceHost}/gdwestServer/sky/shareFile/search`,
     //     method: "post",
     //     params: this.searchForm
     //   }).then(res => {
@@ -462,6 +466,53 @@ export default {
     filePreview(data, cb) {
       const path = data.url || (this.host + data.path)
       console.log('filePreview', path, data)
+      request({
+        url: `${serviceHost}/gdwestServer/sky/shareFile/downLoad`,
+        method: "get",
+        params: { url: data.url, fileName: data.name, type: 'inline' },
+        responseType: 'blob'
+      }).then(res => {
+        const url = window.URL.createObjectURL(res)
+        // else if (data.suffix === 'pdf') { // PDF
+        //   this.preview.url = url
+        //   this.preview.type = 'pdf'
+        //   cb()
+        // } 
+
+        // 图片
+        if (['jpg', 'png', 'jpeg', 'gif'].includes(data.suffix)) {
+          this.preview.url = url
+          this.preview.type = 'img'
+          cb()
+        } else if(['mp4', 'avi', 'mov', 'rmvb', 'rm', 'flv', '3gp', 'mkv', 'wmv', 'asf', 'ts', 'mpg', 'mpeg', 'm4v', 'vob'].includes(data.suffix)) { // 视频
+          this.preview.url = {
+            sources: [
+              {
+                type: `video/${data.suffix}`,
+                src: url
+              }
+            ]
+          }
+          this.preview.type = 'video'
+          cb()
+        } else if (['mp3', 'mav', 'aac', 'flac', 'ogg', 'wma', 'aiff'].includes(data.suffix)) { // 音频
+          this.preview.url = url
+          this.preview.type = 'audio'
+          cb()
+        } else { // 其他
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = data.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }
+      }).catch(err => {
+        console.error(err)
+        this.$message.error('预览失败')
+      })
+
       // if (data.type === 2) {
       //   this.preview.url = path
       //   this.preview.type = 'img'
@@ -479,23 +530,45 @@ export default {
       // } else {
       //   window.open(path, '_blank')
       // }
-      window.open(path, '_blank')
+      // window.open(path, '_blank')
     },
 
     download(data, func) {
       console.log('download', data, func);
-      data = data.filter(item => item.type !== 1)
+      data = data.filter(item => item.type != 1)
+      if (!data.length) return this.$message.warning('未选择文件')
+      // TODO：目前接口只支持单个文件下载
+      if (data.length !== 1) return this.$message.warning('只能选择一个文件下载')
       if (data.length === 1) {
         const file = data[0]
         if (checkSize(file)) {
-          const path = file.url || (this.host + file.path)
-          const a = document.createElement('a')
-          a.href = path
-          a.style.display = 'none'
-          a.download = file.name
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
+          request({
+            url: `${serviceHost}/gdwestServer/sky/shareFile/downLoad`,
+            method: "get",
+            params: { url: data[0].url, fileName: data[0].name, type: 'attachment' },
+            responseType: 'blob'
+          }).then(res => {
+            const url = window.URL.createObjectURL(res)
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data[0].name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+          }).catch(err => {
+            console.error(err)
+            this.$message.error('下载失败')
+          })
+
+          // const path = file.url || (this.host + file.path)
+          // const a = document.createElement('a')
+          // a.href = path
+          // a.style.display = 'none'
+          // a.download = file.name
+          // document.body.appendChild(a)
+          // a.click()
+          // document.body.removeChild(a)
           // if (file.type === 2 || file.type === 3) {
           //   fetch(path).then(res => res.blob()).then(blob => {
           //     const a = document.createElement('a')
@@ -597,9 +670,9 @@ export default {
     },
 
     // 上传完成回调
-    handleUploadSuccess({ data }) {
-      console.log('handleUploadSuccess', data);
-      this.fileSearch({pid: data.pid, key: '' }, true)
+    handleUploadSuccess(res, file) {
+      console.log('handleUploadSuccess', res, file);
+      this.fileSearch({pid: file && file.id, key: '' }, true)
     },
 
     // getTreeSelected(val) {

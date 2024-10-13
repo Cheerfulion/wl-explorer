@@ -816,27 +816,28 @@ export default {
       this.$refs["upload-item"].toUpload();
     },
     // 文件上传成功回调
-    uploadSuccess(res) {
-      this.$emit("uploadSuccess", res);
+    uploadSuccess(res, file, fileList) {
+      console.log(res, file, fileList);
+      this.$emit("uploadSuccess", res, this.file);
       this.closeUpload();
-      if (!res.Data) return;
-      let _res_data = res.Data || {};
-      if (this.isFolderFn) {
-        _res_data.isFolder = this.isFolderFn(_res_data);
-      }
-      if (this.isLockFn) {
-        _res_data.isLock = this.isLockFn(_res_data);
-      }
-      if (this.explorer_upload_data.bizId === this.file.id) {
-        this.self_data.push(_res_data); // 当前文件夹上传 当即展示 因对象引用 历史记录也会自动更改
-        return;
-      }
-      // 非当前 如在历史记录里已有所选路径 则更新历史记录内的数据
-      let _act = this.path.history.find(
-        (i) => i.id === this.explorer_upload_data.bizId
-      );
-      if (!_act) return;
-      _act.data.push(_res_data);
+      // if (!res.Data) return;
+      // let _res_data = res.Data || {};
+      // if (this.isFolderFn) {
+      //   _res_data.isFolder = this.isFolderFn(_res_data);
+      // }
+      // if (this.isLockFn) {
+      //   _res_data.isLock = this.isLockFn(_res_data);
+      // }
+      // if (this.explorer_upload_data.bizId === this.file.id) {
+      //   this.self_data.push(_res_data); // 当前文件夹上传 当即展示 因对象引用 历史记录也会自动更改
+      //   return;
+      // }
+      // // 非当前 如在历史记录里已有所选路径 则更新历史记录内的数据
+      // let _act = this.path.history.find(
+      //   (i) => i.id === this.explorer_upload_data.bizId
+      // );
+      // if (!_act) return;
+      // _act.data.push(_res_data);
     },
     // 文件上传前回调
     uploadBefore(file) {

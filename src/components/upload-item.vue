@@ -64,6 +64,8 @@ export default {
   data() {
     return {
       fileList: [], // 已上传文件
+      uploadCount: 0, // 已上传文件个数
+      totalFiles: 0 // 总文件个数
     };
   },
   props: {
@@ -98,6 +100,8 @@ export default {
     },
     // 上传前验证
     beforeUpload(file) {
+      // console.log('beforeUpload', file, this.$refs.upload.uploadFiles);
+      this.totalFiles = this.$refs.upload.uploadFiles.length;
       this.$emit('beforeUpload', file);
       // 不校验
       if (!this.reg) return true;
@@ -106,7 +110,10 @@ export default {
     },
     // 上传成功回调
     handleSuccess(res, file,fileList) {
-      this.$emit("uploadSuccess", res, file, fileList);
+      this.uploadCount++;
+      if (this.uploadCount === this.totalFiles) {
+        this.$emit("uploadSuccess", res, file, fileList);
+      }
     },
     // 上传失败回调
     handleError(err) {
