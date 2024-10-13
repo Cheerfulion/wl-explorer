@@ -1,7 +1,7 @@
 <template>
   <div class="audio-player-box">
     <h3 class="audio-player-h3"><i class="el-icon-circle-close audio-player-icon" @click="audioClose('close')"></i></h3>
-    <audio class="u-audio" :src="audioUrl" autoplay controls>
+    <audio class="u-audio" :src="audioUrl" autoplay controls ref="audioRef">
       您的浏览器版本过低，暂不支持音频播放，请升级或更换浏览器。
     </audio>
   </div>
@@ -24,6 +24,8 @@ export default {
   },
   methods: {
     audioClose(e) {
+      // 关闭音频播放
+      this.$refs.audioRef.pause();
       if (e == "close") {
         this.$emit("closeAudio");
         return;
@@ -48,11 +50,12 @@ export default {
 
 <style lang="scss">
 .audio-player-box {
-  position: absolute;
+  position: absolute !important;
   top: 30%;
   left: 20%;
   z-index: 99;
-  width: 60%;
+  width: 60% !important;
+  height: auto !important;
   padding: 0 40px 40px;
   box-sizing: border-box;
   border-radius: 4px;

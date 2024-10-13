@@ -53,6 +53,8 @@ export default {
   },
   methods: {
     videoClose() {
+      // 关闭视频播放
+      this.player.pause();
       this.$emit("closeVideo");
     }
   },

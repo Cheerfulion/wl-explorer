@@ -478,7 +478,6 @@ export default {
         //   this.preview.type = 'pdf'
         //   cb()
         // } 
-
         // 图片
         if (['jpg', 'png', 'jpeg', 'gif'].includes(data.suffix)) {
           this.preview.url = url
@@ -500,13 +499,7 @@ export default {
           this.preview.type = 'audio'
           cb()
         } else { // 其他
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = data.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
+          this.$message.error('暂不支持预览')
         }
       }).catch(err => {
         console.error(err)
