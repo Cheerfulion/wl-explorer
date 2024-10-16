@@ -595,6 +595,7 @@ export default {
           id: item[this.selfProps.pathId],
           pid: item[this.selfProps.pathPid],
           path: item[this.selfProps.pathName],
+          options: item[this.selfProps.pathOptions],
         });
       }
 
@@ -639,6 +640,7 @@ export default {
       this.file.path = file.path;
       this.path.level = !file.id || file.id === guid ? 1 : 2;
       this.path.index = -1; // 将步骤从新回到原位
+      this.path.options = file.options || {};
       this.$emit("routerPush", this.path.history);
     },
     /**
@@ -654,6 +656,7 @@ export default {
       this.file.path = file.path;
       this.self_data = data;
       this.path.level = !file.id || file.id === guid ? 1 : 2;
+      this.path.options = file.options || {};
     },
     /**
      * 手动更新历史记录的数据
@@ -764,6 +767,7 @@ export default {
         id: row[this.selfProps.pathId],
         pid: row[this.selfProps.pathPid],
         path: row[this.selfProps.pathName],
+        options: row[this.selfProps.pathOptions],
       });
       this.$emit("search", {pid: this.file.id}, true);
     },
@@ -932,6 +936,8 @@ export default {
     },
     // 处理数据变动
     handleDataChange(val) {
+      console.log('handleDataChange', val);
+      
       let _data = val || [];
       if (this.isFolderFn) {
         _data.forEach((i) => {
@@ -987,6 +993,7 @@ export default {
         pathConnector: "\\", // String 路径父子数据拼接连接符,默认为'\'
         pathParents: "parents", // String 路径数据所有直系祖先节点自增长identityId逗号拼接
         pathIdentityId: "identityId", // String 路径数据自增长id
+        pathOptions: 'options', // String 路径数据配置项
         ...this.props,
       };
     },
@@ -1040,6 +1047,9 @@ export default {
     },
   },
   watch: {
+    self_data(val) {
+      this.$emit("selfDataChange", val, this.path);
+    },
     // 检测data数据更新列表
     data(val) {
       this.handleDataChange(val);
