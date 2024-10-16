@@ -8,6 +8,8 @@
       :upload-url="uploadUrl"
       :upload-headers="uploadHeaders"
       :upload-options="uploadOptions"
+      :upload-reg="true"
+      :upload-reg-fuc="uploadRegFuc"
       @preview="filePreview"
       @search="fileSearch"
       @handleFolder="handleFolder"
@@ -16,7 +18,8 @@
       @upload="fileUpload"
       @download="download"
       @closeFade="closeOtherLayout(fade)"
-      @routerPush="_ => fade.folder = false">
+      @routerPush="_ => fade.folder = false"
+      @selfDataChange="selfDataChange">
 
       <!-- <template slot="table-column-top" v-if="searching">
         <el-table-column align="left" prop="path" label="路径" width="300" show-overflow-tooltip
@@ -222,7 +225,8 @@ export default {
       }, // 文件夹表单验证
       uploadUrl: '',
       uploadHeaders: {},
-      uploadOptions: {}
+      uploadOptions: {},
+      allowUploadFileType: null,
     }
   },
   computed: {
@@ -667,6 +671,26 @@ export default {
       console.log('handleUploadSuccess', res, file);
       this.fileSearch({pid: file && file.id, key: '' }, true)
     },
+
+    /**
+     * @name 自定义文件上传校验
+     */
+    uploadRegFuc(file) {
+      console.log('uploadRegFuc', file, this.path, this.allowUploadFileType);
+      const fileSuffix = file.name.substring(file.name.lastIndexOf('.') + 1)
+      const isAllow = this.allowUploadFileType ? this.allowUploadFileType.includes(fileSuffix) : true
+      if (!isAllow) this.$message.error(`该文件夹不支持上传 ${fileSuffix} 文件，已自动过滤`)
+      return isAllow
+    },
+
+    selfDataChange(selfData, path) {
+      console.log('selfDataChange', selfData, path);
+      if (path && path.options) {
+        this.allowUploadFileType = path.options.allowUploadFileType
+      } else {
+        this.allowUploadFileType = null
+      }
+    }
 
     // getTreeSelected(val) {
     //   this.adcd = val.length > 0 ? val[0].id : getLoginUser().dscd.dscd
