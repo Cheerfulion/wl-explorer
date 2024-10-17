@@ -221,6 +221,7 @@
   left: 250px;
   right: 30px;
   bottom: 30px;
+  overflow: auto;
 }
 
 .wl-explorer .c-blue {
