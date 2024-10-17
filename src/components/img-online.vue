@@ -1,7 +1,10 @@
 <template>
   <div class="img-pre-box" @click="imgClose('close')">
+    <h3 class="img-player-h3"><i class="el-icon-circle-close video-player-icon" @click="imgClose"></i></h3>
     <!-- <pic-zoom :url="imgUrl"></pic-zoom> -->
-    <img class="u-img-pre" :src="imgUrl" alt="图片资料">
+    <div class="img-box">
+      <img class="u-img-pre" :src="imgUrl" alt="图片">
+    </div>
   </div>
 </template>
 
@@ -52,9 +55,30 @@ export default {
   background-color: #fff;
   text-align: center;
 
-  > .u-img-pre {
+  .img-box {
+    background-color: #000;
+    min-height: 200px;
+  }
+
+  .u-img-pre {
     max-width: 100%;
     max-height: 100%;
+  }
+
+  > .img-player-h3 {
+    position: relative;
+    z-index: 9;
+    margin-bottom: -10px;
+    padding: 10px 15px 0;
+    height: 26px;
+    text-align: right;
+    background-color: #000;
+
+    > .video-player-icon {
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+    }
   }
 }
 </style>

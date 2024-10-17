@@ -98,6 +98,18 @@ function getQueryParams(url, name){
     return name ? result[name] : result;
 }
 
+function formatDate(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  const hour = d.getHours()
+  const minute = d.getMinutes()
+  const second = d.getSeconds()
+  return `${year}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day} ${hour < 10 ? '0' + hour : hour}:${minute < 10 ? '0' + minute : minute}:${second < 10 ? '0' + second : second}`
+}
+
 const serviceHost = getQueryParams(window.location.href, 'serviceHost') || window.location.origin
 const kb = 1024, mb = kb * kb, gb = kb * mb
 const maxSize = 2000
@@ -151,15 +163,15 @@ export default {
       },
       searchForm: { keyword: '' },
       file_table_columns: [
-        { label: "名称", prop: "name" },
+        { label: "名称", prop: "name", minWidth: 200 },
         {
-          label: "类型", align: "center", width: 90,
+          label: "类型", align: "center", minWidth: 90,
           formatter(row) {
             return row.type === 1 ? "文件夹" : row.suffix
           },
         },
         {
-          label: "大小", align: "center", width: 120,
+          label: "大小", align: "center", minWidth: 120,
           formatter(row) {
             if (row.size === null) return '-'
             if (row.size < kb) {
@@ -181,8 +193,7 @@ export default {
             return row.createUser.username || "-";
           },
         },
-        { label: "创建日期", prop: "createdTime", align: "center", width: 120 },
-        // { label: "修改日期", prop: "updatedTime", align: "center", width: 120 },
+        { label: "创建时间", prop: "createdTime", align: "center", minWidth: 120, formatter: row => formatDate(row.createdTime) },
       ], // 自定义表格列
       explorer_prop: {
         name: "name",

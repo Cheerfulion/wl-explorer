@@ -1,7 +1,9 @@
-const loginUserKey = 'Login-User'
+// const loginUserKey = 'Login-User'
+const loginUserKey = 'user'
 
 export function getLoginUser() {
-  return JSON.parse(localStorage.getItem(loginUserKey) || '{}');
+  const result = JSON.parse(localStorage.getItem(loginUserKey) || '{}');
+  return (result && result.userInfo) || result || {};
 }
 
 export function setLoginUser(loginUser) {

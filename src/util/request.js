@@ -25,7 +25,7 @@ http.interceptors.request.use(
     }
     // 在发送请求之前做些什么
     if (getLoginUser()) {
-      config.headers.token = getLoginUser().token;
+      config.headers.token = getLoginUser().token || '';
     }
     if(config.contentType=='json'){
       config.headers["Content-type"] = "application/json;charset=UTF-8";

@@ -59,7 +59,7 @@ export default {
   padding: 0 40px 40px;
   box-sizing: border-box;
   border-radius: 4px;
-  background-color: #edd3d3;
+  background-color: #000;
 
   > .audio-player-h3 {
     position: relative;
@@ -75,7 +75,7 @@ export default {
       line-height: 40px;
       text-align: center;
       font-size: 20px;
-      // color: #c6c6c6;
+      color: #fff;
       cursor: pointer;
     }
   }
