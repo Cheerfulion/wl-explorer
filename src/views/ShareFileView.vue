@@ -364,16 +364,16 @@ export default {
       const canDeleteDatas = data.filter(item => item.rourceType != 1) // 收集可删除数据
       // 不可删除数据进行提示
       if (notDeleteDatas.length) {
-        let msg = '<p style="margin: 0 0 10px">以下文件或文件夹不可删除，已自动过滤：</p>';
-        notDeleteDatas.forEach((i) => { msg += `<p style="margin: 0 0 10px">${i.name}</p>` })
-        this.$message({
+        let msg = '<p style="margin: 0 0 10px">以下文件或文件夹不可删除</p>';
+        notDeleteDatas.forEach((i) => { msg += `<p style="margin: 0 0 10px"># ${i.name}</p>` })
+        return this.$message({
           dangerouslyUseHTMLString: true,
           showClose: true,
           message: msg,
           type: "warning",
         });
       }
-      if (!notDeleteDatas.length && !canDeleteDatas) return this.$message.warning('未选择文件')
+      if (!canDeleteDatas.length) return this.$message.warning('未选择文件')
       const deleteIds = canDeleteDatas.map(item => item.id)
       request({
         url: `${serviceHost}/gdwestServer/sky/shareFile/deleteByIds?ids=${deleteIds.join(',')}`,
